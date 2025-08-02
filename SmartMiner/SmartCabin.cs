@@ -35,20 +35,17 @@ public void Main(string argument, UpdateType updateSource) {
     bool docked = driveConnector != null &&
                   driveConnector.Status == MyShipConnectorStatus.Connected;
 
-    // Disable all [DRIVE] thrusters when docked so we don't burn the grid
+    // Check that we are docked to a [DRIVE] connector
+    bool driveDocked = false;
     if (docked)
     {
-        foreach (var thr in driveThrusters)
-            thr.Enabled = false;
-    } else
-    {
-        foreach (var thr in driveThrusters)
-            thr.Enabled = true;
+        var remoteConn = driveConnector.OtherConnector as IMyShipConnector;
+        if (remoteConn != null && remoteConn.CustomName.StartsWith("[DRIVE]"))
+            driveDocked = true;
     }
-    // TODO new thruster disabler
-    // foreach (var thr in driveThrusters) thr.Enabled = !docked;
 
-    //if (!docked) return; // It turns out we can always broadcast, even when undocked
+    // Disable all [DRIVE] thrusters when docked to a [DRIVE] connector so we don't burn the grid
+    foreach (var thr in driveThrusters) thr.Enabled = !docked;
 
     // collect move/rotate/roll input
     Vector3D mv   = driveController.MoveIndicator;     // X=right, Y=up, Z=forward
@@ -90,7 +87,7 @@ public void Main(string argument, UpdateType updateSource) {
 
     // Determine the correct channel and send the message
     string channel = "";
-    if (docked)
+    if (driveDocked)
     {
         var remoteConn = driveConnector.OtherConnector as IMyShipConnector;
         if (remoteConn != null)
@@ -101,6 +98,7 @@ public void Main(string argument, UpdateType updateSource) {
     Echo($"Found Controller? {driveController != null}");
     Echo($"Found Connector?  {driveConnector != null}");
     Echo($"Docked?     {docked}");
+    Echo($"Drive Docked? {driveDocked}");
     Echo($"LastSent:   {lastData}");
     Echo($"Channel:    {channel}");
 

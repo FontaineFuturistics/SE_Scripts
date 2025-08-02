@@ -1,6 +1,8 @@
 IMyShipConnector         driveConnector;
 IMyRemoteControl         driveRemote;
-IMyBroadcastListener     driveListener;
+IMyBroadcastListener driveListener;
+
+IMyShipConnector mainConnector;
 
 List<IMyThrust> forwardThrusters  = new List<IMyThrust>();
 List<IMyThrust> backwardThrusters = new List<IMyThrust>();
@@ -20,6 +22,11 @@ public Program() {
     var cords = new List<IMyShipConnector>();
     GridTerminalSystem.GetBlocksOfType(cords, c => c.CustomName.StartsWith("[DRIVE]"));
     if (cords.Count > 0) driveConnector = cords[0];
+
+    // find the [MAIN] connector
+    var cords2 = new List<IMyShipConnector>();
+    GridTerminalSystem.GetBlocksOfType(cords2, c => c.CustomName.StartsWith("[MAIN]"));
+    if (cords2.Count > 0) mainConnector = cords2[0];
 
     // find the [DRIVE] remote control
     var remotes = new List<IMyRemoteControl>();
@@ -57,15 +64,17 @@ public Program() {
 
 public void Main(string argument, UpdateType updateSource) {
     // Debug info
-    Echo($"Remote?    {driveRemote != null}");
-    Echo($"Connector? {driveConnector != null}");
+    Echo($"Found Remote?    {driveRemote != null}");
+    Echo($"Found Drive Connector? {driveConnector != null}");
+    Echo($"Found Main Connector? {mainConnector != null}");
     bool docked = driveConnector != null &&
                   driveConnector.Status == MyShipConnectorStatus.Connected;
-    Echo($"Docked?    {docked}");
+    Echo($"Drive Docked?    {docked}");
+    bool mainDocked = mainConnector != null &&
+                      mainConnector.Status == MyShipConnectorStatus.Connected;
+    Echo($"Main Docked?     {mainDocked}");
     Echo($"Channel: drive-{driveConnector.EntityId}");
     Echo($"LastMsg:   {lastMessage}");
-
-    // ——— Removed auto-lock here ———
 
     // grab any pending “drive” broadcasts
     while (driveListener.HasPendingMessage) {
@@ -84,17 +93,17 @@ public void Main(string argument, UpdateType updateSource) {
         }
     }
 
-    if (docked) {
+    if (docked && !mainDocked) { // if we are docked to the drive connector, but not to a larger grid, move
         driveRemote.SetAutoPilotEnabled(false);
         driveRemote.DampenersOverride = false;
         ApplyMovement();
-    } else {
+    } else if (!mainDocked) { // If we are entirely undocked, we need to hold position
         ClearMovement();
         driveRemote.DampenersOverride = true;
         driveRemote.ClearWaypoints();
         driveRemote.AddWaypoint(driveRemote.GetPosition(), "Hold");
         driveRemote.SetAutoPilotEnabled(true);
-    }
+    } // If we are docked to main, we do nothing
 }
 
 void ApplyMovement()
