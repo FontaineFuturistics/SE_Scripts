@@ -16,7 +16,7 @@ public Program() {
 
     // find the connector named “[DRIVE]…”
     var cords = new List<IMyShipConnector>();
-    GridTerminalSystem.GetBlocksOfType(cords, c => c.CustomName.StartsWith("[DRIVE]"));
+    GridTerminalSystem.GetBlocksOfType(cords, c => c.CustomName.StartsWith("[DRIVE]") && c.CubeGrid == Me.CubeGrid);
     if (cords.Count > 0) driveConnector = cords[0];
 
     // Get all [DRIVE] thrusters on this grid
@@ -32,13 +32,8 @@ public Program() {
 }
 
 public void Main(string argument, UpdateType updateSource) {
-    // Debug info
-    Echo($"Controller? {driveController != null}");
-    Echo($"Connector?  {driveConnector != null}");
     bool docked = driveConnector != null &&
                   driveConnector.Status == MyShipConnectorStatus.Connected;
-    Echo($"Docked?     {docked}");
-    Echo($"LastSent:   {lastData}");
 
     // Disable all [DRIVE] thrusters when docked so we don't burn the grid
     if (docked)
@@ -50,6 +45,8 @@ public void Main(string argument, UpdateType updateSource) {
         foreach (var thr in driveThrusters)
             thr.Enabled = true;
     }
+    // TODO new thruster disabler
+    // foreach (var thr in driveThrusters) thr.Enabled = !docked;
 
     //if (!docked) return; // It turns out we can always broadcast, even when undocked
 
@@ -62,7 +59,7 @@ public void Main(string argument, UpdateType updateSource) {
     bool hasInput = Math.Abs(mv.X) > 0.01 || Math.Abs(mv.Y) > 0.01 || Math.Abs(mv.Z) > 0.01 ||
                     Math.Abs(rot.X) > 0.01 || Math.Abs(rot.Y) > 0.01 || Math.Abs(roll) > 0.01;
 
-    // New braking code
+    // Auto braking
     if (driveController.DampenersOverride && !hasInput)
     {
         // grab current velocities
@@ -87,12 +84,27 @@ public void Main(string argument, UpdateType updateSource) {
         if (Math.Abs(localVel.Z) > threshold && Math.Abs(mv.Z) < threshold)
             mv.Z = (float)(-localVel.Z / Math.Abs(localVel.Z));
     }
-    // End new braking code
 
     // serialize to CSV
     lastData = $"{mv.X:F3},{mv.Y:F3},{mv.Z:F3},{rot.X:F3},{rot.Y:F3},{roll:F3}";
-    //lastData = $"{mv.X:F3},{mv.Y:F3},{mv.Z:F3},{rot.Y:F3},{rot.X:F3},{roll:F3}";
 
-    // broadcast each tick on “drive”
-    IGC.SendBroadcastMessage("drive", lastData);
+    // Determine the correct channel and send the message
+    string channel = "";
+    if (docked)
+    {
+        var remoteConn = driveConnector.OtherConnector as IMyShipConnector;
+        if (remoteConn != null)
+            channel = "drive-" + remoteConn.EntityId;
+    }
+
+    // Log
+    Echo($"Found Controller? {driveController != null}");
+    Echo($"Found Connector?  {driveConnector != null}");
+    Echo($"Docked?     {docked}");
+    Echo($"LastSent:   {lastData}");
+    Echo($"Channel:    {channel}");
+
+    // broadcast only when docked and we have a channel
+    if (!string.IsNullOrEmpty(channel))
+        IGC.SendBroadcastMessage(channel, lastData);
 }

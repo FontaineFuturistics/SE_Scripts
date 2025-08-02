@@ -30,9 +30,10 @@ public Program() {
         driveRemote.DampenersOverride = true;
     }
 
-    // subscribe to “drive” broadcasts
-    driveListener = IGC.RegisterBroadcastListener("drive");
-    driveListener.SetMessageCallback("drive");
+    // subscribe on our per-pair channel
+    string channel = "drive-" + driveConnector.EntityId;
+    driveListener = IGC.RegisterBroadcastListener(channel);
+    driveListener.SetMessageCallback(channel);
 
     // gather thrusters belonging strictly to this grid
     var allThrusters = new List<IMyThrust>();
@@ -61,6 +62,7 @@ public void Main(string argument, UpdateType updateSource) {
     bool docked = driveConnector != null &&
                   driveConnector.Status == MyShipConnectorStatus.Connected;
     Echo($"Docked?    {docked}");
+    Echo($"Channel: drive-{driveConnector.EntityId}");
     Echo($"LastMsg:   {lastMessage}");
 
     // ——— Removed auto-lock here ———
