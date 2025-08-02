@@ -45,7 +45,7 @@ public void Main(string argument, UpdateType updateSource) {
     }
 
     // Disable all [DRIVE] thrusters when docked to a [DRIVE] connector so we don't burn the grid
-    foreach (var thr in driveThrusters) thr.Enabled = !docked;
+    foreach (var thr in driveThrusters) thr.Enabled = !driveDocked;
 
     // collect move/rotate/roll input
     Vector3D mv   = driveController.MoveIndicator;     // X=right, Y=up, Z=forward
