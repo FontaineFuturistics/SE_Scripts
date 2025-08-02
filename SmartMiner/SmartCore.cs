@@ -63,6 +63,8 @@ public void Main(string argument, UpdateType updateSource) {
     Echo($"Docked?    {docked}");
     Echo($"LastMsg:   {lastMessage}");
 
+    // ——— Removed auto-lock here ———
+
     // grab any pending “drive” broadcasts
     while (driveListener.HasPendingMessage) {
         var msg = driveListener.AcceptMessage();
@@ -114,34 +116,37 @@ void ApplyMovement()
     setT(rightThrusters, Math.Max(0, right));
     setT(leftThrusters, Math.Max(0, -right));
 
-    foreach (var g in gyros) {
-        g.GyroOverride = true;
-        var local = Vector3D.TransformNormal(
-           currentRotation, 
-           Matrix.Transpose(g.WorldMatrix.GetOrientation()));
-        g.Pitch = (float)local.X;
-        g.Yaw   = (float)local.Y;
-        g.Roll  = (float)local.Z;
+    // 'rot' is Vector3D(rotationX, rotationY, roll) in driveRemote-local coordinates
+    // 'gyros' is List<IMyGyro>
+    // 'driveRemote' is your IMyRemoteControl or cockpit
+
+    // 1) Convert from driveRemote local → world space
+    var worldRotation = Vector3D.TransformNormal(
+        currentRotation, 
+        driveRemote.WorldMatrix.GetOrientation()
+    );
+
+    // 2) Apply to each gyro
+    foreach (var gyro in gyros)
+    {
+        gyro.GyroOverride = true;
+
+        // Extract the gyro’s rotation matrix and invert it via transpose
+        Matrix gyroOri   = gyro.WorldMatrix.GetOrientation();
+        Matrix invGyroOri = Matrix.Transpose(gyroOri);
+
+        // Transform world vector into this gyro’s local axes
+        Vector3D localRot = Vector3D.TransformNormal(
+            worldRotation, 
+            invGyroOri
+        );
+
+        gyro.Pitch = (float)localRot.X;
+        gyro.Yaw   = (float)localRot.Y;
+        gyro.Roll  = (float)localRot.Z;
     }
-    // foreach (var g in gyros) {
-    //     g.GyroOverride = true;
 
-    //     // 1) Grab the full world‐matrix of this gyro
-    //     var world = g.WorldMatrix;
 
-    //     // 2) Remove translation so we only have rotation
-    //     world.Translation = Vector3D.Zero;
-
-    //     // 3) Invert rotation by transposing (orthonormal matrix)
-    //     var invRot = MatrixD.Transpose(world);
-
-    //     // 4) Rotate our ship‐local rotation into gyro‐local axes
-    //     var local = Vector3D.TransformNormal(currentRotation, invRot);
-
-    //     g.Pitch = (float)local.X;
-    //     g.Yaw = (float)local.Y;
-    //     g.Roll = (float)local.Z;
-    // }
 }
 
 void ClearMovement() {
