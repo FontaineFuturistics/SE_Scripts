@@ -1,5 +1,6 @@
 IMyShipController driveController;
-IMyShipConnector  driveConnector;
+IMyShipConnector driveConnector;
+List<IMyThrust> driveThrusters;
 string            lastData = "<none>";
 
 public Program() {
@@ -18,6 +19,14 @@ public Program() {
     GridTerminalSystem.GetBlocksOfType(cords, c => c.CustomName.StartsWith("[DRIVE]"));
     if (cords.Count > 0) driveConnector = cords[0];
 
+    // Get all [DRIVE] thrusters on this grid
+    driveThrusters = new List<IMyThrust>();
+    GridTerminalSystem.GetBlocksOfType(
+        driveThrusters,
+        t => t.CubeGrid == Me.CubeGrid 
+          && t.CustomName.StartsWith("[DRIVE]")
+    );
+
     // run every tick
     Runtime.UpdateFrequency = UpdateFrequency.Update1;
 }
@@ -30,6 +39,17 @@ public void Main(string argument, UpdateType updateSource) {
                   driveConnector.Status == MyShipConnectorStatus.Connected;
     Echo($"Docked?     {docked}");
     Echo($"LastSent:   {lastData}");
+
+    // Disable all [DRIVE] thrusters when docked so we don't burn the grid
+    if (docked)
+    {
+        foreach (var thr in driveThrusters)
+            thr.Enabled = false;
+    } else
+    {
+        foreach (var thr in driveThrusters)
+            thr.Enabled = true;
+    }
 
     //if (!docked) return; // It turns out we can always broadcast, even when undocked
 
