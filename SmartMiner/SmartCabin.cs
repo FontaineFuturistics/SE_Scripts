@@ -58,15 +58,19 @@ public void Main(string argument, UpdateType updateSource) {
     Vector2  rot  = driveController.RotationIndicator; // X=pitch, Y=yaw
     double   roll = driveController.RollIndicator;
 
+    // Check if there is input
+    bool hasInput = Math.Abs(mv.X) > 0.01 || Math.Abs(mv.Y) > 0.01 || Math.Abs(mv.Z) > 0.01 ||
+                    Math.Abs(rot.X) > 0.01 || Math.Abs(rot.Y) > 0.01 || Math.Abs(roll) > 0.01;
+
     // New braking code
-    if (driveController.DampenersOverride)
+    if (driveController.DampenersOverride && !hasInput)
     {
         // grab current velocities
-        var shipVel    = driveController.GetShipVelocities();
-        Vector3D worldVel    = shipVel.LinearVelocity;
+        var shipVel = driveController.GetShipVelocities();
+        Vector3D worldVel = shipVel.LinearVelocity;
         Vector3D worldAngVel = shipVel.AngularVelocity;
 
-        // convert into cockpit‐local space
+        // convert into cockpit-local space
         var localVel = Vector3D.TransformNormal(
             worldVel,
             MatrixD.Transpose(driveController.WorldMatrix)
@@ -87,6 +91,7 @@ public void Main(string argument, UpdateType updateSource) {
 
     // serialize to CSV
     lastData = $"{mv.X:F3},{mv.Y:F3},{mv.Z:F3},{rot.X:F3},{rot.Y:F3},{roll:F3}";
+    //lastData = $"{mv.X:F3},{mv.Y:F3},{mv.Z:F3},{rot.Y:F3},{rot.X:F3},{roll:F3}";
 
     // broadcast each tick on “drive”
     IGC.SendBroadcastMessage("drive", lastData);

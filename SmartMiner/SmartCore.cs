@@ -63,8 +63,6 @@ public void Main(string argument, UpdateType updateSource) {
     Echo($"Docked?    {docked}");
     Echo($"LastMsg:   {lastMessage}");
 
-    // ——— Removed auto-lock here ———
-
     // grab any pending “drive” broadcasts
     while (driveListener.HasPendingMessage) {
         var msg = driveListener.AcceptMessage();
@@ -95,34 +93,55 @@ public void Main(string argument, UpdateType updateSource) {
     }
 }
 
-void ApplyMovement() {
+void ApplyMovement()
+{
     // invert forward/backward only
-    float fwd   = (float)currentTranslation.Z;
-    float up    = (float)currentTranslation.Y;
+    float fwd = (float)currentTranslation.Z;
+    float up = (float)currentTranslation.Y;
     float right = (float)currentTranslation.X;
 
-    Action<List<IMyThrust>, float> setT = (list, val) => {
+    Action<List<IMyThrust>, float> setT = (list, val) =>
+    {
         foreach (var t in list)
             t.ThrustOverridePercentage = MathHelper.Clamp(val, 0f, 1f);
     };
 
     // swapped the sign here
-    setT(forwardThrusters,   Math.Max(0, -fwd));
-    setT(backwardThrusters,  Math.Max(0,  fwd));
-    setT(upThrusters,        Math.Max(0,  up));
-    setT(downThrusters,      Math.Max(0, -up));
-    setT(rightThrusters,     Math.Max(0,  right));
-    setT(leftThrusters,      Math.Max(0, -right));
+    setT(forwardThrusters, Math.Max(0, -fwd));
+    setT(backwardThrusters, Math.Max(0, fwd));
+    setT(upThrusters, Math.Max(0, up));
+    setT(downThrusters, Math.Max(0, -up));
+    setT(rightThrusters, Math.Max(0, right));
+    setT(leftThrusters, Math.Max(0, -right));
 
     foreach (var g in gyros) {
         g.GyroOverride = true;
         var local = Vector3D.TransformNormal(
-            currentRotation, 
-            Matrix.Transpose(g.WorldMatrix.GetOrientation()));
+           currentRotation, 
+           Matrix.Transpose(g.WorldMatrix.GetOrientation()));
         g.Pitch = (float)local.X;
         g.Yaw   = (float)local.Y;
         g.Roll  = (float)local.Z;
     }
+    // foreach (var g in gyros) {
+    //     g.GyroOverride = true;
+
+    //     // 1) Grab the full world‐matrix of this gyro
+    //     var world = g.WorldMatrix;
+
+    //     // 2) Remove translation so we only have rotation
+    //     world.Translation = Vector3D.Zero;
+
+    //     // 3) Invert rotation by transposing (orthonormal matrix)
+    //     var invRot = MatrixD.Transpose(world);
+
+    //     // 4) Rotate our ship‐local rotation into gyro‐local axes
+    //     var local = Vector3D.TransformNormal(currentRotation, invRot);
+
+    //     g.Pitch = (float)local.X;
+    //     g.Yaw = (float)local.Y;
+    //     g.Roll = (float)local.Z;
+    // }
 }
 
 void ClearMovement() {
