@@ -20,17 +20,17 @@ string   lastMessage        = "<none>";
 public Program() {
     // find the [DRIVE] connector
     var cords = new List<IMyShipConnector>();
-    GridTerminalSystem.GetBlocksOfType(cords, c => c.CustomName.StartsWith("[DRIVE]"));
+    GridTerminalSystem.GetBlocksOfType(cords, c => c.CustomName.StartsWith("[DRIVE]") && c.CubeGrid == Me.CubeGrid);
     if (cords.Count > 0) driveConnector = cords[0];
 
     // find the [MAIN] connector
     var cords2 = new List<IMyShipConnector>();
-    GridTerminalSystem.GetBlocksOfType(cords2, c => c.CustomName.StartsWith("[MAIN]"));
+    GridTerminalSystem.GetBlocksOfType(cords2, c => c.CustomName.StartsWith("[MAIN]") && c.CubeGrid == Me.CubeGrid);
     if (cords2.Count > 0) mainConnector = cords2[0];
 
     // find the [DRIVE] remote control
     var remotes = new List<IMyRemoteControl>();
-    GridTerminalSystem.GetBlocksOfType(remotes, r => r.CustomName.StartsWith("[DRIVE]"));
+    GridTerminalSystem.GetBlocksOfType(remotes, r => r.CustomName.StartsWith("[DRIVE]") && r.CubeGrid == Me.CubeGrid);
     if (remotes.Count > 0) {
         driveRemote = remotes[0];
         // ensure you can auto-hold when undocked
