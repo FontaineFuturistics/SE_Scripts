@@ -1,18 +1,25 @@
 IMyShipController driveController;
+List<IMyShipController>        driveControllers;
 IMyShipConnector driveConnector;
 List<IMyThrust> driveThrusters;
 string            lastData = "<none>";
 
 public Program() {
-    // find the ship controller (cockpit or remote) named “[DRIVE]…”
+    // find the ship controllers (cockpit or remote) named “[DRIVE]…” or “[DRIVE MAIN]”
     var controllers = new List<IMyShipController>();
     GridTerminalSystem.GetBlocksOfType(
         controllers,
-        c => c.CustomName.StartsWith("[DRIVE]") 
-          && c.CubeGrid == Me.CubeGrid
+        c => (c.CustomName.StartsWith("[DRIVE]") || c.CustomName.StartsWith("[DRIVE MAIN]"))
+              && c.CubeGrid == Me.CubeGrid
     );
-    if (controllers.Count > 0)
-        driveController = controllers[0];
+
+    // store all of them, pick the MAIN for velocity/braking if it exists
+    driveControllers = controllers;
+    if (controllers.Count > 0) {
+        // look for “[DRIVE MAIN]”
+        var main = controllers.Find(c => c.CustomName.StartsWith("[DRIVE MAIN]"));
+        driveController = main ?? controllers[0];
+    }
 
     // find the connector named “[DRIVE]…”
     var cords = new List<IMyShipConnector>();
@@ -48,9 +55,30 @@ public void Main(string argument, UpdateType updateSource) {
     foreach (var thr in driveThrusters) thr.Enabled = !driveDocked;
 
     // collect move/rotate/roll input
-    Vector3D mv   = driveController.MoveIndicator;     // X=right, Y=up, Z=forward
-    Vector2  rot  = driveController.RotationIndicator; // X=pitch, Y=yaw
-    double   roll = driveController.RollIndicator;
+    Vector3D mv = Vector3D.Zero;             // X=right, Y=up, Z=forward
+    Vector2  rot = Vector2.Zero;             // X=pitch, Y=yaw
+    double   roll = 0;
+
+    // Collect input from all [DRIVE] controllers
+    if (driveControllers != null && driveControllers.Count > 0) {
+        foreach (var ctrl in driveControllers) {
+            // transform this controller's input into the main controller's local space
+            // 1) Move
+            Vector3D worldMv   = Vector3D.TransformNormal(ctrl.MoveIndicator, ctrl.WorldMatrix);
+            Vector3D localMv   = Vector3D.TransformNormal(worldMv, MatrixD.Transpose(driveController.WorldMatrix));
+
+            // 2) Rotation & Roll: build a 3D vector then reproject
+            Vector3D worldRot3 = ctrl.RotationIndicator.X * ctrl.WorldMatrix.Right
+                               + ctrl.RotationIndicator.Y * ctrl.WorldMatrix.Up
+                               + ctrl.RollIndicator     * ctrl.WorldMatrix.Forward;
+            Vector3D localRot3 = Vector3D.TransformNormal(worldRot3, MatrixD.Transpose(driveController.WorldMatrix));
+
+            mv   += localMv;
+            rot.X += (float)localRot3.X;
+            rot.Y += (float)localRot3.Y;
+            roll  -=  localRot3.Z; // Roll is inverted in Space Engineers, so we negate it
+        }
+    }
 
     // Check if there is input
     bool hasInput = Math.Abs(mv.X) > 0.01 || Math.Abs(mv.Y) > 0.01 || Math.Abs(mv.Z) > 0.01 ||
@@ -95,7 +123,7 @@ public void Main(string argument, UpdateType updateSource) {
     }
 
     // Log
-    Echo($"Found Controller? {driveController != null}");
+    Echo($"Found Controllers: {driveControllers?.Count ?? 0}");
     Echo($"Found Connector?  {driveConnector != null}");
     Echo($"Docked?     {docked}");
     Echo($"Drive Docked? {driveDocked}");
